@@ -1,42 +1,34 @@
-import { prisma } from "../../lib/prisma";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 
-export async function getServerSideProps({ params }) {
-  const { id } = params;
+export default function PastePage() {
+  const router = useRouter();
+  const { id } = router.query;
 
-  const paste = await prisma.paste.findUnique({
-    where: { id },
-  });
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
-  if (!paste) {
-    return { notFound: true };
-  }
+  useEffect(() => {
+    if (!id) return;
 
-  const now = new Date();
+    fetch(`/api/pastes/${id}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || "Error");
+        }
+        return res.json();
+      })
+      .then(setData)
+      .catch((err) => setError(err.message));
+  }, [id]);
 
-  if (paste.expiresAt && paste.expiresAt <= now) {
-    return { notFound: true };
-  }
+  if (error) return <p>{error}</p>;
+  if (!data) return <p>Loading...</p>;
 
-  if (paste.maxViews !== null && paste.views >= paste.maxViews) {
-    return { notFound: true };
-  }
-
-  await prisma.paste.update({
-    where: { id },
-    data: { views: { increment: 1 } },
-  });
-
-  return {
-    props: {
-      content: paste.content,
-    },
-  };
-}
-
-export default function PastePage({ content }) {
   return (
-    <main style={{ padding: "20px", fontFamily: "monospace" }}>
-      <pre>{content}</pre>
-    </main>
+    <pre style={{ whiteSpace: "pre-wrap" }}>
+      {data.content}
+    </pre>
   );
 }
